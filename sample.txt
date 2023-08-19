@@ -1,0 +1,16 @@
+// wasyyp this a comment
+#include<iostream.h>
+using namespace std;
+/* yoo
+yoo
+*/
+
+#define BIG 5
+
+int main ()
+{
+	int x, a = 2, b = 3, c = 5;
+	x = a+b*c;
+	printf("The value of x is %d", x);
+	return 0;
+}

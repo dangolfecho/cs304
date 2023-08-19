@@ -1,0 +1,18 @@
+literals
+keywords
+operators
+punctuators
+delimiters
+identifiers
+constants
+special characters
+
+header
+literal
+keyword
+op
+punc
+delim
+ident
+constant
+special
