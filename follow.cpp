@@ -34,6 +34,8 @@ int main(){
 	cout << "Enter epsilon to signify empty string\n";
 	map<char, vector<string>> m;
 	set<char> nt;
+	set<char> terminals;
+	terminals.insert('$');
 	map<char,int> nt_worth;
 	char left;
 	char start;
@@ -48,6 +50,12 @@ int main(){
 		cin >> right;
 		m[left].push_back(right);
 		nt.insert(left);
+	}
+	for(auto x:m){
+		vec = x.second;
+		for(auto y:vec){
+
+		}
 	}
 	cout << "Enter which NT is the start symbol\n";
 	cin >> start;
@@ -156,6 +164,47 @@ int main(){
 			cout << x << " ";
 		}
 		cout << "\n";
+	}
+	map<pair<char,char>,vector<string>> table;
+	bool f = false;
+	for(auto x:m){
+		char current_nt = x.first;
+		vector<string> prods = x.second;
+		for(auto y:prods){
+			if(y == "epsilon"){
+				vector<string> follow_val = follow[current_nt];
+				for(auto z:follow_val){
+					pair<char,char> p = {current_nt, z[0]};
+					string ep = "epsilon";
+					string fprod = current_nt + " -> " +;
+					table[p].push_back(fprod);
+				}
+				continue;
+			}
+			for(int i=0;i<y.size();i++){
+				f = false;
+				if(nt.find(y[i]) == nt.end()){
+					pair<char, char> p = {current_nt, y[i]};
+					string fprod = current_nt + " -> " + y[i];
+					table[p].push_back(fprod);
+				}
+				else{
+					vector<string> first_val = first[y[i]];
+					for(auto z:first_val){
+						if(z == "epsilon"){
+							f = true;
+							continue;
+						}
+						pair<char,char> p = {current_nt, z[0]};
+						string fprod = current_nt + " -> " + z;
+						table[p].push_back(fprod);
+					}
+				}
+				if(!f){
+					break;
+				}
+			}
+		}
 	}
 	return 0;
 }
