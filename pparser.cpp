@@ -40,7 +40,9 @@ class PredParser{
 		void printParseOutput(string prod);
 		void setFirstDone(char x);
 		void setFollowDone(char x);
+		bool firstContainsEmpty(char x);
 		bool isFirstDone();
+		bool isFollowDone();
 		bool isFirstCalculated(char x);
 		bool isFollowCalculated(char x);
 		void insert(char left, string right);
@@ -83,10 +85,37 @@ void PredParser:: setFollowDone(char x){
 	follow_calculation[x] = true;
 }
 
+bool PredParser:: firstContainsEmpty(char x){
+	vector<string>:: iterator it = first[x].begin();
+	bool t_flag = false;
+	while(it != first[x].end()){
+		if((*it) == "epsilon"){
+			t_flag = true;
+			break;
+		}
+		it++;
+	}
+	return t_flag;
+}
+
 bool PredParser:: isFirstDone(){
 	bool t_flag = true;
 	map<char, bool>:: iterator it = first_calculation.begin();
 	while(it != first_calculation.end()){
+		bool right = it->second;
+		if(!right){
+			t_flag = false;
+			break;
+		}
+		it++;
+	}
+	return t_flag;
+}
+
+bool PredParser:: isFollowDone(){
+	bool t_flag = true;
+	map<char, bool>:: iterator it = follow_calculation.begin();
+	while(it != follow_calculation.end()){
 		bool right = it->second;
 		if(!right){
 			t_flag = false;
@@ -197,6 +226,7 @@ void PredParser:: calcFollow(int index){
 						for(int j=0;j<x.size();j++){
 							follow[current_nt].push_back(x[j]);
 						}
+						setFollowDone(current_nt);
 					}
 					else{
 						if(left_cur != current_nt){
@@ -216,6 +246,7 @@ void PredParser:: calcFollow(int index){
 									continue;
 								}
 								follow[current_nt].push_back(x[k]);
+								setFollowDone(current_nt);
 							}
 							if(!t_flag){
 								break;
@@ -226,18 +257,20 @@ void PredParser:: calcFollow(int index){
 							for(int j=0;j<x.size();j++){
 								follow[current_nt].push_back(x[j]);
 							}
+							setFollowDone(current_nt);
 							break;
 						}
 					}
 					else{
 						follow[current_nt].push_back(string(1, prod[i+1]));
+						setFollowDone(current_nt);
 					}
 				}
 			}
 		}
 		it++;
 	}
-	setFollowDone(current_nt);
+	//setFollowDone(current_nt);
 }
 
 void PredParser:: simplify(){
@@ -262,33 +295,37 @@ void PredParser:: simplify(){
 void PredParser:: calcTable(){
 	findTerminals();
 	map<char, vector<string>>::iterator it = grammar.begin();
-	bool t_flag = false;
 	while(it != grammar.end()){
 		char left = it->first;
 		vector<string> prods = it->second;
 		vector<string>::iterator it1 = prods.begin();
-		t_flag = false;
 		vector<string>::iterator fi = first[left].begin();
-		for(fi;fi != first[left].end();fi++){
-			if(*fi == "epsilon"){
-				t_flag = true;
-				continue;
-			}
-			for(it1; it1 != prods.end(); it1++){
-				string pusher = string(1, left) + " -> " + *it1;
-				tuple<char, char> t = make_tuple(left, (*fi)[0]);
-				table[t].push_back(pusher);
+		for(it1 = prods.begin(); it1 != prods.end(); it1++){
+			string current_prod = *it1;
+			if(current_prod == "epsilon" || (isNonTerminal(current_prod[0]) && firstContainsEmpty(current_prod[0]) )){
+				vector<string>::iterator it2 = follow[left].begin();
+				for(it2 = follow[left].begin(); it2 != follow[left].end(); it2++){
+					string pusher = string(1, left) + " -> " + current_prod;
+					tuple<char, char> t = make_tuple(left, (*it2)[0]);
+					table[t].push_back(pusher);
+				}
 			}
 		}
-		if(t_flag){
-			vector<string>::iterator fo = follow[left].begin();
-			for(fo;fo != follow[left].end(); fo++){
-				for(it1 = prods.begin(); it1 != prods.end(); it1++){
-					string pusher = string(1, left) + " -> " + *it1;
-					tuple<char, char> t = make_tuple(left, (*fo)[0]);
-					table[t].push_back(pusher);
-					if(table[t].size() > 1){
-						flag = false;
+		for(fi;fi != first[left].end();fi++){
+			for(it1 = prods.begin(); it1 != prods.end(); it1++){
+				if(*(it1) != "epsilon" && (!isNonTerminal((*it1)[0]) || !firstContainsEmpty((*it1)[0]))){
+					string cur_prod = *it1;
+					if(!isNonTerminal(cur_prod[0])){
+						if((*fi)[0] == cur_prod[0]){
+							string pusher = string(1, left) + " -> " + cur_prod;
+							tuple<char, char> t = make_tuple(left, (*fi)[0]);
+							table[t].push_back(pusher);
+						}
+					}
+					else{
+						string pusher = string(1, left) + " -> " + *it1;
+						tuple<char, char> t = make_tuple(left, (*fi)[0]);
+						table[t].push_back(pusher);
 					}
 				}
 			}
@@ -379,6 +416,7 @@ void PredParser:: createFollowPrereq(){
 bool PredParser:: parse(){
 	input += "$";
 	input_ptr = 0;
+	parse_stack.clear();
 	parse_stack.push_back('$');
 	parse_stack.push_back(start);
 	cout << "STACK\t\tINPUT\t\tPRODUCTION\n";
@@ -400,6 +438,9 @@ bool PredParser:: parse(){
 			string prod = table[make_tuple(top, ip)][0];
 			printParseOutput(prod);
 			parse_stack.pop_back();
+			if(prod.substr(5,7) == "epsilon"){
+				continue;
+			}
 			for(int i=prod.size()-1;i>-1;i--){
 				if(prod[i] == ' '){
 					break;
@@ -446,9 +487,11 @@ void PredParser:: startFunc(){
 	}
 	follow[start].push_back("$");
 	createFollowPrereq();
-	for(int i=0;i<nonterminals.size();i++){
-		if(!isFollowCalculated(nonterminals[i])){
-			calcFollow(i);
+	while(!isFollowDone()){
+		for(int i=0;i<nonterminals.size();i++){
+			if(!isFollowCalculated(nonterminals[i])){
+				calcFollow(i);
+			}
 		}
 	}
 	flag = true;
