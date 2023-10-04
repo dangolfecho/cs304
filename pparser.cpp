@@ -1,7 +1,3 @@
-//find first
-//find follow
-//create predictive parser table
-//simulate accepting a string
 #include<bits/stdc++.h>
 using namespace std;
 
