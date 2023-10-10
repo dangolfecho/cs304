@@ -4,6 +4,7 @@ using namespace std;
 class OpParser{
 	private:
 		char start;
+		string input;
 		set<char> nonterminals_unique;
 		vector<char> nonterminals;
 		set<char> terminals_unique;
@@ -12,14 +13,17 @@ class OpParser{
 		map<char, bool> trailing_done;
 		map<char, vector<char>> leading;
 		map<char, vector<char>> trailing;
+		map<string, char> reversed_productions;
 		map<tuple<char, char>, string> table;
 		vector<char> stack;
 		map<char, vector<string>> grammar;
 		void initNonTerms();
 		void initTerminals();
+		void initReverse();
 		void insert(string left, string right);
 		void accept();
 		bool isNonTerminal(char x);
+		bool isTerminal(char x);
 		void setLeadingDone(char x);
 		void setTrailingDone(char x);
 		bool isLeadingDone();
@@ -33,7 +37,8 @@ class OpParser{
 		void simplify();
 		void calcTable();
 		void printTable();
-		bool parse(string x);
+		void printOutput(int ptr, char left, string right, int status);
+		bool parse();
 		bool isOpGrammar();
 	public:
 		void startFunc();
@@ -53,7 +58,6 @@ bool OpParser:: isLeadingDone(){
 			return false;
 		}
 	}
-	cout << "HERE\n";
 	return true;
 }
 
@@ -102,6 +106,7 @@ void OpParser:: initTerminals(){
 		terminals.push_back(*(it1));
 		it1++;
 	}
+	terminals_unique.insert('$');
 	terminals.push_back('$');
 }
 
@@ -170,6 +175,7 @@ void OpParser:: accept(){
 		cout << "Enter a valid start symbol\n";
 	}
 	initNonTerms();
+	initTerminals();
 }
 
 bool OpParser:: isNonTerminal(char x){
@@ -179,19 +185,34 @@ bool OpParser:: isNonTerminal(char x){
 	return true;
 }
 
+bool OpParser:: isTerminal(char x){
+	if(terminals_unique.find(x) == terminals_unique.end()){
+		return false;
+	}
+	return true;
+}
+
 void OpParser:: calcLeading(char x){
 	char current_nt = x;
 	vector<string> current_prods = grammar[x];
-	cout << "hi\n";
 	for(int i=0;i<current_prods.size();i++){
 		string current_prod = current_prods[i];
-		cout << current_prod << "\n";
-		if(!isNonTerminal(current_prod[0])){
+		if(isNonTerminal(current_prod[0]) && current_prod.size() == 1){
+			if(isLeadingCalc(current_prod[0])){
+				vector<char>:: iterator it = leading[current_prod[0]].begin();
+				while(it != leading[current_prod[0]].end()){
+					leading[current_nt].push_back(*it);
+					it++;
+				}
+				setLeadingDone(current_nt);
+			}
+		}
+		if(isTerminal(current_prod[0])){
 			leading[current_nt].push_back(current_prod[0]);
 			setLeadingDone(current_nt);
 		}
 		for(int j=1;j<current_prod.size()-1;j++){
-			if(isNonTerminal(current_prod[j-1]) && isNonTerminal(current_prod[j+1])){
+			if(isNonTerminal(current_prod[j-1]) && isTerminal(current_prod[j])){
 				leading[current_nt].push_back(current_prod[j]);
 				if(isLeadingCalc(current_prod[j-1])){
 					vector<char>:: iterator it = leading[current_prod[j-1]].begin();
@@ -202,6 +223,7 @@ void OpParser:: calcLeading(char x){
 					setLeadingDone(current_nt);
 				}
 				else{
+					setLeadingDone(current_nt);
 					if(current_prod[j-1] != current_nt){
 						calcLeading(current_prod[j-1]);
 					}
@@ -216,12 +238,22 @@ void OpParser:: calcTrailing(char x){
 	vector<string> current_prods = grammar[x];
 	for(int i=0;i<current_prods.size();i++){
 		string current_prod = current_prods[i];
-		if(!isNonTerminal(current_prod[current_prod.size()-1])){
+		if(current_prod.size() == 1 && isNonTerminal(current_prod[0])){
+			if(isTrailingCalc(current_prod[0])){
+				vector<char> v = trailing[current_prod[0]];
+				for(int j=0;j<v.size();j++){
+					trailing[current_nt].push_back(v[j]);
+				}
+				setTrailingDone(current_nt);
+			}
+
+		}
+		if(isTerminal(current_prod[current_prod.size()-1])){
 			trailing[current_nt].push_back(current_prod[current_prod.size()-1]);
 			setTrailingDone(current_nt);
 		}
-		for(int j=1;j<current_prod.size()-1;j++){
-			if(isNonTerminal(current_prod[j-1]) && isNonTerminal(current_prod[j+1])){
+		for(int j=current_prod.size()-2;j>0;j--){
+			if(isNonTerminal(current_prod[j+1]) && isTerminal(current_prod[j]) && isNonTerminal(current_prod[j-1])){
 				trailing[current_nt].push_back(current_prod[j]);
 				if(isTrailingCalc(current_prod[j+1])){
 					vector<char>:: iterator it = trailing[current_prod[j+1]].begin();
@@ -242,7 +274,6 @@ void OpParser:: calcTrailing(char x){
 }
 
 void OpParser:: calcTable(){
-	initTerminals();
 	simplify();
 	tuple<char, char> t;
 	for(int i=0;i<leading[start].size();i++){
@@ -260,22 +291,22 @@ void OpParser:: calcTable(){
 			string prod = prods[i];
 			for(int j=0;j<(prod.size()-1);j++){
 				if(j+2 < prod.size()){
-					if(!isNonTerminal(prod[j]) && isNonTerminal(prod[j+1]) && !isNonTerminal(prod[j+2])){
+					if(isTerminal(prod[j]) && isNonTerminal(prod[j+1]) && isTerminal(prod[j+2])){
 						t = make_tuple(prod[j], prod[j+2]);
 						table[t] = "=";
 					}
 				}
-				else if(!isNonTerminal(prod[j]) && !isNonTerminal(prod[j+1])){
+				if(isTerminal(prod[j]) && isTerminal(prod[j+1])){
 					t = make_tuple(prod[j], prod[j+1]);
 					table[t] = "=";
 				}
-				else if(!isNonTerminal(prod[j]) && isNonTerminal(prod[j+1])){
-					for(int k=0;j<leading[prod[j+1]].size() ;k++){
+				if(isTerminal(prod[j]) && isNonTerminal(prod[j+1])){
+					for(int k=0;k<leading[prod[j+1]].size() ;k++){
 						t = make_tuple(prod[j], leading[prod[j+1]][k]);
 						table[t] = "<.";
 					}
 				}
-				else if(isNonTerminal(prod[j]) && !isNonTerminal(prod[j+1])){
+				else if(isNonTerminal(prod[j]) && isTerminal(prod[j+1])){
 					for(int k=0;k<trailing[prod[j]].size(); k++){
 						t = make_tuple(trailing[prod[j]][k], prod[j+1]);
 						table[t] = ".>";
@@ -312,20 +343,120 @@ void OpParser:: printTrailing(){
 void OpParser:: printTable(){
 	cout << " ";
 	for(int i=0;i<terminals.size();i++){
-		cout << terminals[i] << "  ";
+		cout << terminals[i] << "  | ";
 	}
 	cout << "\n";
 	for(int i=0;i<terminals.size();i++){
-		cout << terminals[i] << " ";
+		cout << terminals[i] << " | ";
 		for(int j=0;j<terminals.size();j++){
-			cout << table[make_tuple(terminals[i], terminals[j])] << " ";
+			cout << table[make_tuple(terminals[i], terminals[j])] << " | ";
 		}
 		cout << "\n";
 	}
 }
 
-bool OpParser:: parse(string input){
-	cout << "HI\n";
+void OpParser:: initReverse(){
+	map<char, vector<string>>:: iterator it = grammar.begin();
+	while(it != grammar.end()){
+		char current_nt = it->first;
+		vector<string> v = it->second;
+		for(int i=0;i<v.size();i++){
+			reversed_productions[v[i]] = current_nt;
+		}
+		it++;
+	}
+}
+
+void OpParser:: printOutput(int ptr, char left, string right, int status){
+	if(status == 0){
+		for(int i=0;i<stack.size();i++){
+			cout << stack[i];
+		}
+		cout << "\t\t";
+		char f = input[ptr];
+		for(int i=ptr;i<input.size();i++){
+			cout << input[i];
+		}
+		cout << "$\t\t";
+		cout << "SHIFT " << left << " " << right << " " << input[ptr] << "\n";
+	}
+	else{
+		for(int i=0;i<stack.size();i++){
+			cout << stack[i];
+		}
+		cout << "\t\t";
+		for(int i=ptr;i<input.size();i++){
+			cout << input[i];
+		}
+		cout << "$\t\t";
+		cout << "Reduce by " << left << " -> " << right << "\n";
+	}
+}
+
+
+bool OpParser:: parse(){
+	stack.push_back('$');
+	initReverse();
+	int ptr = 0;
+	tuple<char, char> t;
+	cout << "STACK\t\tINPUT\t\tACTION\n";
+	while(ptr != input.size() || (stack.size() == 2 && stack[2] != start)){
+		int i;
+		for(i=stack.size()-1;i>-1;i--){
+			if(isTerminal(stack[i])){
+				break;
+			}
+		}
+		int val;
+		char left;
+		string ans;
+		t = make_tuple(stack[i], input[ptr]);
+		if(table[t] == ""){
+			cout << "ERROR!\n";
+			return false;
+		}
+		if(table[t] == "<." || table[t] == "="){
+			printOutput(ptr, stack[i], table[t], 0);
+			stack.push_back(input[ptr]);
+			ptr++;
+		}
+		else{
+			val = stack.size()-2;
+			while(true){
+				if(isTerminal(stack[val])){
+					t = make_tuple(stack[val], input[ptr]);
+					if(table[t] == "<."){
+						for(int i=val+1;i<stack.size();i++){
+							ans += string(1, stack[i]);
+						}
+						left = reversed_productions[ans];
+						if(isNonTerminal(left)){
+							break;
+						}
+					}
+					else{
+						printOutput(ptr, reversed_productions[string(1, stack[val])], ans, 1);
+						stack.pop_back();
+						stack.push_back(reversed_productions[string(1, left)]);
+						ans = "";
+					}
+				}
+				val--;
+			}
+			printOutput(ptr, left, ans, 1);
+			while(val--){
+				stack.pop_back();
+			}
+			stack.push_back(left);
+			if(ptr != input.size() && left == start){
+				if(isNonTerminal(reversed_productions[string(1, left)])){
+					printOutput(ptr, reversed_productions[string(1, left)], "S", 1);
+					stack.pop_back();
+					stack.push_back(reversed_productions[string(1, left)]);
+				}
+			}
+		}
+	}
 	return true;	
 }
 
@@ -356,16 +487,14 @@ void OpParser:: startFunc(){
 		cout << "The given grammar is not an operator grammar!\n";
 		return;
 	}
-	cout << "HERE\n";
-	while(isLeadingDone()){
-		cout << "inHERE\n";
+	while(!isLeadingDone()){
 		for(int i=0;i<nonterminals.size();i++){
 			if(!isLeadingCalc(nonterminals[i])){
 				calcLeading(nonterminals[i]);
 			}
 		}
 	}
-	while(isTrailingDone()){
+	while(!isTrailingDone()){
 		for(int i=0;i<nonterminals.size();i++){
 			if(!isTrailingCalc(nonterminals[i])){
 				calcTrailing(nonterminals[i]);
@@ -376,11 +505,10 @@ void OpParser:: startFunc(){
 	printLeading();
 	printTrailing();
 	printTable();
-	string input;
 	while(true){
 		cout << "Enter the string to be checked\n";
 		cin >> input;
-		bool f = parse(input);
+		bool f = parse();
 		if(f){
 			cout << "The string has been successfully parsed!\n";
 		}
