@@ -266,7 +266,9 @@ void PredParser:: calcFollow(int index){
 		}
 		it++;
 	}
-	//setFollowDone(current_nt);
+	if(current_follow_instances.size() == 0){
+		setFollowDone(current_nt);
+	}
 }
 
 void PredParser:: simplify(){
