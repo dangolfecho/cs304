@@ -4,6 +4,7 @@ using namespace std;
 class OpParser{
 	private:
 		char start;
+		int rightmost_term;
 		string input;
 		set<char> nonterminals_unique;
 		vector<char> nonterminals;
@@ -430,14 +431,24 @@ bool OpParser:: parse(){
 							ans += string(1, stack[i]);
 						}
 						left = reversed_productions[ans];
-						if(isNonTerminal(left)){
-							break;
-						}
+						break;
 					}
 					else{
-						printOutput(ptr, reversed_productions[string(1, stack[val])], ans, 1);
-						stack.pop_back();
-						stack.push_back(reversed_productions[string(1, left)]);
+						for(int i=val+1;i<stack.size();i++){
+							ans += string(1, stack[i]);
+						}
+						left = reversed_productions[ans];
+						if(!isNonTerminal(left)){
+							ans = "";
+							val--;
+							continue;
+						}
+						printOutput(ptr, left, ans, 1);
+						int c = ans.size();
+						while(c--){
+							stack.pop_back();
+						}
+						stack.push_back(left);
 						ans = "";
 					}
 				}
