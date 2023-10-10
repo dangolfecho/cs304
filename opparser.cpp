@@ -401,7 +401,7 @@ bool OpParser:: parse(){
 	int ptr = 0;
 	tuple<char, char> t;
 	cout << "STACK\t\tINPUT\t\tACTION\n";
-	while(ptr != input.size() || (stack.size() == 2 && stack[2] != start)){
+	while(ptr != input.size() || (stack[0] != '$' || stack[1] != start)){
 		int i;
 		for(i=stack.size()-1;i>-1;i--){
 			if(isTerminal(stack[i])){
@@ -411,7 +411,12 @@ bool OpParser:: parse(){
 		int val;
 		char left;
 		string ans;
-		t = make_tuple(stack[i], input[ptr]);
+		if(ptr != input.size()){
+			t = make_tuple(stack[i], input[ptr]);
+		}
+		else{
+			t = make_tuple(stack[i], '$');
+		}
 		if(table[t] == ""){
 			cout << "ERROR!\n";
 			return false;
@@ -422,19 +427,31 @@ bool OpParser:: parse(){
 			ptr++;
 		}
 		else{
-			val = stack.size()-2;
+			val = stack.size()-1;
 			while(true){
 				if(isTerminal(stack[val])){
 					t = make_tuple(stack[val], input[ptr]);
-					if(table[t] == "<."){
+					if(table[t] == "<." || table[t] == "="){
 						for(int i=val+1;i<stack.size();i++){
 							ans += string(1, stack[i]);
 						}
-						left = reversed_productions[ans];
+						left =  reversed_productions[ans];
+						if(!isNonTerminal(left)){
+							ans = "";
+							val--;
+							continue;
+						}
+						printOutput(ptr, left, ans, 1);
+						int c = ans.size();
+						while(c--){
+							stack.pop_back();
+						}
+						stack.push_back(left);
+						ans = "";
 						break;
 					}
 					else{
-						for(int i=val+1;i<stack.size();i++){
+						for(int i=val;i<stack.size();i++){
 							ans += string(1, stack[i]);
 						}
 						left = reversed_productions[ans];
@@ -450,15 +467,14 @@ bool OpParser:: parse(){
 						}
 						stack.push_back(left);
 						ans = "";
+						if(ptr == input.size() && stack[1] == start){
+							cout << "$" << start << "\t\t$\t\tAccept\n";
+							return true;
+						}
 					}
 				}
 				val--;
 			}
-			printOutput(ptr, left, ans, 1);
-			while(val--){
-				stack.pop_back();
-			}
-			stack.push_back(left);
 			if(ptr != input.size() && left == start){
 				if(isNonTerminal(reversed_productions[string(1, left)])){
 					printOutput(ptr, reversed_productions[string(1, left)], "S", 1);
