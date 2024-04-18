@@ -199,7 +199,7 @@ void Lexer:: tokenize(){
 	for(it = lines.begin(); it != lines.end(); it++){
 		temp = *it;
 		for(int i = 0; i < temp.size(); i++){
-			if(temp[i] == ' '){
+			if(temp[i] == ' ' || temp[i] == '\t'){
 				continue;
 			}
 			else if(temp[i] == '/' && (i+1) < temp.size() && temp[i+1] == '/'){
